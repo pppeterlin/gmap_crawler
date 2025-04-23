@@ -4,32 +4,31 @@ import asyncio
 from crawler.browser_pool import BrowserPool  # 你的現成 pool
 from crawler.html_parser import extract_info
 from crawler.store import save_result
+from crawler.crawler import handle_task  # 加入這行在 import 區塊
 
 async def worker_loop():
-    r = redis.Redis()
+    r = redis.Redis(host="localhost", port=6379, db=0)
     async with BrowserPool() as pool:
         while True:
-            _, task_data = r.blpop("gmap_tasks")  # 阻塞等待任務
-            if not task_data:
+            # 批次撈取 100 筆任務
+            tasks_batch = []
+            for _ in range(100):
+                data = r.blpop("gmap_tasks")
+                if data:
+                    _, task_data = data
+                    task = json.loads(task_data)
+                    tasks_batch.append(task)
+
+            if not tasks_batch:
                 print("No more tasks in Redis. Exiting.")
                 break
 
-            task = json.loads(task_data)
-            print(f"[TASK] Fetching: {task['url']}")
+            print(f"[TASK] Fetching batch of {len(tasks_batch)} URLs")
 
-            async def run(page):
-                await page.goto(task["url"])
-                await page.wait_for_selector(".Nv2PK", timeout=10000)
-                html = await page.content()
-                print(f"HTML length: {len(html)}")
+            async def run(task):
+                await handle_task(task, pool)
+                r.incr("gmap_tasks_done")
 
-                items = extract_info(html)
-                print(f"Parsed {len(items)} items")
-
-                for item in items:
-                    print(f"Saving item: {item.get('title', str(item))}")
-                    await save_result(item)
-
-            await pool.use_context(run)
+            await asyncio.gather(*(run(task) for task in tasks_batch))
 
 asyncio.run(worker_loop())
