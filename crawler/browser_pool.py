@@ -1,8 +1,9 @@
 from playwright.async_api import async_playwright, Browser
 import asyncio
+from crawler.config import MAX_CONTEXT, MAX_PAGES_PER_CONTEXT
 
 class BrowserPool:
-    def __init__(self, max_contexts=3, max_pages_per_context=3):
+    def __init__(self, max_contexts=MAX_CONTEXT, max_pages_per_context=MAX_PAGES_PER_CONTEXT):
         self.max_contexts = max_contexts
         self.max_pages = max_pages_per_context
         self.semaphore = asyncio.Semaphore(max_contexts * max_pages_per_context)
@@ -30,7 +31,7 @@ class BrowserPool:
 
     async def __aenter__(self):
         self.playwright = await async_playwright().start()
-        self.browser = await self.playwright.chromium.launch(headless=False)
+        self.browser = await self.playwright.chromium.launch(headless=True)
         return self
 
     async def __aexit__(self, *args):
