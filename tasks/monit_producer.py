@@ -1,10 +1,12 @@
 import time
+from datetime import datetime
 import redis
 import json
 from tasks.task_queue import load_tasks
 
 r = redis.Redis(host="localhost", port=6379, db=0)
-tasks = load_tasks()
+file_path="./tasks/sample/tasks_10000_tw_4cities.json"
+tasks = load_tasks(file_path)
 
 # 清空 Redis 中的狀態（視情況使用）
 r.flushdb()
@@ -31,4 +33,7 @@ while True:
         break
     else:
         print(f"Progress: {done}/{len(tasks)}", end="\r")
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open("./tasks/sample/progress.log", "a", encoding="utf-8") as log_file:
+            log_file.write(f"[{now}] Progress: {done}/{len(tasks)}\n")
         time.sleep(1)
