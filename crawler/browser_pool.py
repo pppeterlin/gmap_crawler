@@ -1,5 +1,6 @@
 from playwright.async_api import async_playwright, Browser
 import asyncio
+import redis, random
 from crawler.config import MAX_CONTEXT, MAX_PAGES_PER_CONTEXT
 
 class BrowserPool:
@@ -72,5 +73,88 @@ class BrowserPool:
                 return await fn(page)
             finally:
                 await page.close()  # 每個 page 用完即關，不需等 context 所有 page 結束
+                async with self.lock:
+                    ctx_entry["active"] -= 1
+
+
+class BrowserPoolProxy:
+    def __init__(self, max_contexts=MAX_CONTEXT, max_pages_per_context=MAX_PAGES_PER_CONTEXT):
+        self.max_contexts = max_contexts
+        self.max_pages = max_pages_per_context
+        self.semaphore = asyncio.Semaphore(max_contexts * max_pages_per_context)
+        self.contexts = []
+        self.browser: Browser = None
+        self.lock = asyncio.Lock()
+        self.redis = redis.Redis(host="localhost", port=6379, db=0)
+        self.proxy_pool = []
+        self.proxy_index = 0
+
+    async def load_proxies(self):
+        proxies = self.redis.lrange("gmap_proxies", 0, -1)
+        self.proxy_pool = [p.decode("utf-8") for p in proxies]
+        if not self.proxy_pool:
+            print("[WARNING] Proxy pool is empty!")
+
+    async def __aenter__(self):
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(headless=False)
+        await self.load_proxies()
+        return self
+
+    async def __aexit__(self, *args):
+        for ctx in self.contexts:
+            await ctx["context"].close()
+        await self.browser.close()
+        await self.playwright.stop()
+
+    async def _get_available_context(self):
+        async with self.lock:
+            # 先找現有 context
+            for ctx in self.contexts:
+                if ctx["active"] < self.max_pages:
+                    ctx["active"] += 1
+                    return ctx
+
+            # 沒有空位，就建新的context
+            if len(self.contexts) < self.max_contexts:
+                proxy_server = None
+                if self.proxy_pool:
+                    candidate = random.choice(self.proxy_pool)
+                    proxy_server = candidate if candidate.strip() else None
+
+                if proxy_server:
+                    context = await self.browser.new_context(proxy={"server": proxy_server})
+                else:
+                    context = await self.browser.new_context()
+
+                ctx_entry = {"context": context, "active": 1, "proxy": proxy_server}
+                self.contexts.append(ctx_entry)
+                print(f"[Context] Created with proxy: {proxy_server}")
+                return ctx_entry
+
+            # 都滿了，等一下再重試
+            await asyncio.sleep(0.1)
+            return await self._get_available_context()
+
+    async def use_context(self, fn):
+        async with self.semaphore:
+            ctx_entry = await self._get_available_context()
+            context = ctx_entry["context"]
+            proxy_used = ctx_entry.get("proxy")
+            try:
+                page = await context.new_page()
+                await fn(page)
+                return True
+            except Exception as e:
+                if proxy_used:
+                    print(f"[Proxy Error] Mark proxy failed: {proxy_used}")
+                    self.redis.sadd("gmap_failed_proxies", proxy_used)
+                print(f"[Page Error] {e}")
+                return False
+            finally:
+                try:
+                    await page.close()
+                except Exception:
+                    pass
                 async with self.lock:
                     ctx_entry["active"] -= 1

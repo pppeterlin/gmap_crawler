@@ -3,7 +3,9 @@ from pathlib import Path
 from asyncio import Lock
 
 # result_file = Path("./results/output_touyuan.jsonl")
-result_file = Path("./results/output_redis_test.jsonl")
+result_file = Path("./results/output.jsonl")
+# result_file = Path("./results/output_redis_test.jsonl")
+# result_file = Path("./results/output_redis_test_10000.jsonl")
 result_file.parent.mkdir(exist_ok=True, parents=True)
 
 lock = Lock()  # async-safe write
