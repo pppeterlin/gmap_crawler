@@ -5,7 +5,8 @@ import json
 from tasks.task_queue import load_tasks
 
 r = redis.Redis(host="localhost", port=6379, db=0)
-file_path="./tasks/sample/tasks_10000_tw_4cities.json"
+# file_path="./tasks/sample/tasks_10000_tw_4cities.json"
+file_path="./tasks/sample/tasks_taipei_100.json"
 tasks = load_tasks(file_path)
 
 # 清空 Redis 中的狀態（視情況使用）

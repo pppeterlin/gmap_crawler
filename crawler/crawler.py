@@ -29,7 +29,7 @@ async def block_resource_types(page):
 async def handle_task(task, pool):
     async def process(page):
         await block_resource_types(page)
-        await page.goto(task["url"])
+        await page.goto(task["url"], timeout=60000)
         await page.wait_for_selector(".Nv2PK", timeout=10000)
 
         html = await page.content()
