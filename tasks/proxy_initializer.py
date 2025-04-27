@@ -9,17 +9,17 @@ def main():
         "http://0.0.0.0:8080",
         "http://127.0.0.2:8888",
         "http://192.168.300.1:9999",
-        # "http://example.invalid:8000",
-        # "http://bad.proxy.test:1234",
-        # "http://1.2.3.4:5678",
-        # "http://255.255.255.255:8888",
-        # "http://10.255.255.1:8080",
+        "http://example.invalid:8000",
+        "http://bad.proxy.test:1234",
+        "http://1.2.3.4:5678",
+        "http://255.255.255.255:8888",
+        "http://10.255.255.1:8080",
         # "http://unreachable.proxy:9000",
         # "http://proxy.doesnotexist.com:8080"
     ]
 
     # 6 個空的 proxy（代表直接不使用代理）
-    empty_proxies = [""] * 10
+    empty_proxies = [""] * 3
 
     # 合併所有 proxy
     all_proxies = broken_proxies + empty_proxies
@@ -31,7 +31,7 @@ def main():
     for proxy in all_proxies:
         r.rpush("gmap_proxies", proxy)
 
-    print(f"[INFO] Inserted {len(all_proxies)} proxies into Redis (10 broken + 6 empty).")
+    print(f"[INFO] Inserted {len(all_proxies)} proxies into Redis ({len(broken_proxies)} broken + {len(empty_proxies)} empty).")
 
 if __name__ == "__main__":
     main()

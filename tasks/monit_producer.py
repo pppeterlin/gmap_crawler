@@ -10,7 +10,9 @@ file_path="./tasks/sample/tasks_taipei_100.json"
 tasks = load_tasks(file_path)
 
 # 清空 Redis 中的狀態（視情況使用）
-r.flushdb()
+# r.flushdb()
+for key in ["gmap_tasks", "gmap_failed_tasks", "gmap_tasks_done", "gmap_total_tasks", "gmap_task_start"]:
+    r.delete(key)
 
 # 記錄任務總數與起始時間
 r.set("gmap_total_tasks", len(tasks))

@@ -121,6 +121,13 @@ class BrowserPoolProxy:
                 if self.proxy_pool:
                     candidate = random.choice(self.proxy_pool)
                     proxy_server = candidate if candidate.strip() else None
+                # proxy = self.redis.lindex("gmap_proxies", 0)
+                # if proxy:
+                #     proxy_server = proxy.decode("utf-8")
+                #     if not proxy_server or proxy_server.lower() == "localhost":
+                #         proxy_server = None
+                # else:
+                #     proxy_server = None
 
                 if proxy_server:
                     context = await self.browser.new_context(proxy={"server": proxy_server})
@@ -141,20 +148,29 @@ class BrowserPoolProxy:
             ctx_entry = await self._get_available_context()
             context = ctx_entry["context"]
             proxy_used = ctx_entry.get("proxy")
+            page = None
             try:
                 page = await context.new_page()
                 await fn(page)
-                return True
+                return True, proxy_used, ctx_entry
             except Exception as e:
-                if proxy_used:
-                    print(f"[Proxy Error] Mark proxy failed: {proxy_used}")
-                    self.redis.sadd("gmap_failed_proxies", proxy_used)
                 print(f"[Page Error] {e}")
-                return False
+                try:
+                    await ctx_entry["context"].close()
+                    async with self.lock:
+                        if ctx_entry in self.contexts:
+                            self.contexts.remove(ctx_entry)
+                    print(f"[Context Closed] due to error (proxy={proxy_used})")
+                except Exception as close_err:
+                    print(f"[Context Close Error] {close_err}")
+                return False, proxy_used, ctx_entry
             finally:
                 try:
-                    await page.close()
+                    if page:
+                        await page.close()
                 except Exception:
                     pass
                 async with self.lock:
                     ctx_entry["active"] -= 1
+
+############
