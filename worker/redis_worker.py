@@ -12,7 +12,7 @@ async def worker_loop():
         while True:
             # 批次撈取 100 筆任務
             tasks_batch = []
-            for _ in range(100):
+            for _ in range(50):
                 data = r.blpop("gmap_tasks")
                 if data:
                     _, task_data = data
@@ -26,7 +26,7 @@ async def worker_loop():
             print(f"[TASK] Fetching batch of {len(tasks_batch)} URLs")
 
             async def run(task):
-                await handle_task(task, pool)
+                await handle_task(task, pool, r)
                 r.incr("gmap_tasks_done")
 
             await asyncio.gather(*(run(task) for task in tasks_batch))

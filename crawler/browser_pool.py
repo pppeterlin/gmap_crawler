@@ -68,11 +68,20 @@ class BrowserPool:
         async with self.semaphore:
             ctx_entry = await self._get_available_context()
             context = ctx_entry["context"]
+            page = None
             try:
                 page = await context.new_page()
-                return await fn(page)
+                await fn(page)
+                return True, None
+            except Exception as e:
+                print(f"[Page Error] {e}")
+                return False, e
             finally:
-                await page.close()  # 每個 page 用完即關，不需等 context 所有 page 結束
+                try:
+                    if page:
+                        await page.close()
+                except Exception:
+                    pass
                 async with self.lock:
                     ctx_entry["active"] -= 1
 
