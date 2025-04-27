@@ -81,7 +81,7 @@ def main():
             print(f"\n✅ All worker results combined into {combined_path}.")
             print(f"\n✅ All {done} tasks completed in {duration:.2f} seconds.")
 
-            # 重點！結束所有 workers
+            # 正常結束所有 workers
             for p in processes:
                 p.terminate()
                 p.join()
@@ -90,7 +90,6 @@ def main():
 
         time.sleep(1)
 
-    # （這裡 p.join() 不需要了，因為 _exit 會直接結束）
-
+        
 if __name__ == "__main__":
     main()
